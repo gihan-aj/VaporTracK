@@ -2,56 +2,52 @@ package main
 
 import (
 	"log"
+	"net"
+
 	"vaportrack/engine/internal/domain"
 	"vaportrack/engine/internal/infrastructure/storage"
+	grpcapi "vaportrack/engine/internal/infrastructure/grpc" // Alias the import
+
+	"google.golang.org/grpc"
 )
 
 func main() {
 	log.Println("Booting up VaporTrack Engine...")
 
 	// 1. Initialize Infrastructure (SQLite)
-	// This will create 'vaportrack.db' in the folder where you run the command
 	repo, err := storage.NewSQLiteRepository("vaportrack.db")
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	log.Println("Database connection established and tables created!")
-	
-	// 2. Test the Db: Add Cyberpunk 2077
-	log.Println("Seeding database with Cyberpunk 2077...")
+	log.Println("Database connection established!")
+
+	// (Optional) Seed the database with Cyberpunk 2077 if it's not already there
 	cyberpunk := &domain.TrackedGame{
-		AppID: 			"1091500",
-		UserID: 		"user_1",
-		Title: 			"Cyberpunk 2077",
-		TargetPrice:	29.99,
-		IsActive: 		true,
+		AppID:       "1091500",
+		UserID:      "user_1",
+		Title:       "Cyberpunk 2077",
+		TargetPrice: 29.99,
+		IsActive:    true,
 	}
-	
-	if err := repo.AddGame(cyberpunk); err != nil {
-		log.Printf("Failed to add game: %v", err)
-	} else {
-		log.Printf("Successfully added Cyberpunk 2077 to the wishlist!")
-	}
+	_ = repo.AddGame(cyberpunk) // Ignoring error for brevity since it uses UPSERT
 
-	// 3. Verify: Read it back
-	games, err := repo.GetActiveGamesByUser("user_1")
+	// 2. Initialize the gRPC Service
+	trackerService := grpcapi.NewGameTrackerService(repo)
+
+	// 3. Set up the TCP Listener on port 50051 (Standard gRPC port)
+	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		log.Printf("Failed to fetch games: %v", err)
+		log.Fatalf("Failed to listen on port 50051: %v", err)
 	}
 
-	log.Printf("User_1 is currently tracking %d games", len(games))
-	for _, g := range games {
-		log.Printf(" - %s (Target: $%.2f)", g.Title, g.TargetPrice)
-	}
+	// 4. Create and start the gRPC Server
+	grpcServer := grpc.NewServer()
+	grpcapi.RegisterGameTrackerServer(grpcServer, trackerService)
 
-	// Initialize Domain Services / Use Cases
-	// TODO: Create the tracking service that uses the repository
-
-	// Start the Engine (gRPC Server / Background Polling)
-	// TODO: Start goroutines for polling CheapShark
-
-	log.Println("Engine is running. Press CTRL+C to exit.")
+	log.Println("⚡ gRPC Server is actively listening on port 50051...")
 	
-	// Temporary block to keep the application running until we add real background workers
-	select {} 
+	// Serve() is a blocking call, so we no longer need the 'select {}' trick
+	if err := grpcServer.Serve(listener); err != nil {
+		log.Fatalf("Failed to serve gRPC server: %v", err)
+	}
 }

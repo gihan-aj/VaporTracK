@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+// Defines the namespace for the generated C# code in your WinUI app
+option csharp_namespace = "VaporTrack.Client.Grpc";
+
+// Defines the import path and package name for the generated Go code
+option go_package = "vaportrack/engine/internal/infrastructure/grpc;grpcapi";
+
+package vaportrack;
+
+// ----------------------------------------
+// The Service Definition
+// ----------------------------------------
+service GameTracker {
+    rpc GetTrackedGames (GetTrackedGamesRequest) returns (GetTrackedGamesResponse);
+}
+
+// ----------------------------------------
+// The Request & Response Messages
+// ----------------------------------------
+message GetTrackedGamesRequest {
+  string user_id = 1;
+}
+
+message GetTrackedGamesResponse {
+  // 'repeated' is Protobuf's way of saying this is a List or Array
+  repeated TrackedGame games = 1; 
+}
+
+// ----------------------------------------
+// The Core Data Model
+// ----------------------------------------
+message TrackedGame {
+  string app_id = 1;
+  string title = 2;
+  double target_price = 3;
+  bool is_active = 4;
+}
